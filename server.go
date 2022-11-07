@@ -30,9 +30,8 @@ type server struct {
 
 func (s *server) setupRouter() {
 	s.classifiers = make(map[string]*bayesian.Classifier)
-
-	//	s.router = gin.Default()
 	s.router = gin.New()
+
 	s.router.Use(gin.Recovery())
 
 	s.router.PUT("/classifier/:name", s.addClassifier)
@@ -86,7 +85,7 @@ func (s *server) deleteClassifier(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"result": "ok"})
 		return
 	}
-	c.AbortWithError(http.StatusNotFound, errors.New("Not found"))
+	c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": "not found"})
 }
 
 func (s *server) addClassifier(c *gin.Context) {

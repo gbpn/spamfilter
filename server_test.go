@@ -1,13 +1,13 @@
 package main
 
 import (
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
+	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -19,6 +19,7 @@ type testHTTPRequest struct{
 }
 
 func doReq(api server, rtype string, path string, body string) (testHTTPRequest) {
+
 	res := testHTTPRequest{}
 
 	res.request, _ = http.NewRequest(rtype, path, strings.NewReader(body))
@@ -30,8 +31,9 @@ func doReq(api server, rtype string, path string, body string) (testHTTPRequest)
 	return res
 }
 
-func TestNewClassifier(t *testing.T) {
+func TestCreate(t *testing.T) {
 	var api server
+	gin.SetMode("test")
 	api.setupRouter()
 	// Classifier must have a json body
 	res := doReq(api, "PUT", "/classifier/test1", "")
@@ -50,14 +52,38 @@ func TestNewClassifier(t *testing.T) {
 	assert.Contains(t, res.body, "ok")
 
 	// But the same classifier twice should be a 409 conflict
-	println("Bad one stats here")
 	res = doReq(api, "PUT", "/classifier/test1", "{\"classes\":[\"good\",\"bad\"]}")
 	assert.NoError(t, res.err)
-	fmt.Printf("%+v\n", res.response)
 	assert.Equal(t,409, res.response.Code)
 	assert.Contains(t, res.body, "already exists")
-	println("Bad one ends here")
 
+}
+func TestDelete(t *testing.T) {
+	var api server
+	gin.SetMode("test")
+	api.setupRouter()
+
+	res := doReq(api, "DELETE", "/classifier/test1","")
+	assert.NoError(t, res.err)
+	assert.Contains(t, res.body, "not found")
+	assert.Equal(t,404, res.response.Code)
+
+	// Make one to delete
+	res = doReq(api, "PUT", "/classifier/test1", "{\"classes\":[\"good\",\"bad\"]}")
+	assert.NoError(t, res.err)
+	assert.Equal(t,200, res.response.Code)
+	assert.Contains(t, res.body, "ok")
+
+	// Make sure we can delete it
+	res = doReq(api, "DELETE", "/classifier/test1","")
+	assert.NoError(t, res.err)
+	assert.Equal(t,200, res.response.Code)
+	assert.Contains(t, res.body, "ok")
+
+	// But not twice
+	res = doReq(api, "DELETE", "/classifier/test1","")
+	assert.Contains(t, res.body, "not found")
+	assert.Equal(t,404, res.response.Code)
 }
 
 
