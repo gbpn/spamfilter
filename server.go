@@ -31,7 +31,10 @@ type server struct {
 func (s *server) setupRouter() {
 	s.classifiers = make(map[string]*bayesian.Classifier)
 
-	s.router = gin.Default()
+	//	s.router = gin.Default()
+	s.router = gin.New()
+	s.router.Use(gin.Recovery())
+
 	s.router.PUT("/classifier/:name", s.addClassifier)
 	s.router.DELETE("/classifier/:name", s.deleteClassifier)
 	s.router.POST("/classifier/train/:name", s.train)
@@ -89,16 +92,16 @@ func (s *server) deleteClassifier(c *gin.Context) {
 func (s *server) addClassifier(c *gin.Context) {
 	name := c.Param("name")
 	body := reqClassifier{}
-	if err := c.BindJSON(&body); err != nil {
-    c.AbortWithStatusJSON(http.StatusInternalServerError , gin.H{"error": err.Error()})
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.AbortWithStatusJSON(http.StatusInternalServerError , gin.H{"error": err.Error()})
 		return
 	}
 	if _, set := s.classifiers[name]; set {
-		c.AbortWithError(http.StatusConflict, errors.New("Already exists"))
+		c.AbortWithStatusJSON(http.StatusConflict, gin.H{"error":"already exists"})
 		return
 	}
 	if len(body.Classes) < 2 {
-    c.AbortWithStatusJSON(http.StatusInternalServerError , gin.H{"error": "At least 2 classes must be provided"})
+		c.AbortWithStatusJSON(http.StatusBadRequest , gin.H{"error": "At least 2 classes must be provided"})
 		return
 	}
 	s.classifiers[name] = bayesian.NewClassifier(body.Classes...)
