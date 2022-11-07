@@ -11,7 +11,7 @@ import (
 )
 
 type reqClassifier struct {
-	Classes []bayesian.Class `json:"types"`
+	Classes []bayesian.Class `json:"classes"`
 }
 
 type reqPredict struct {
@@ -25,9 +25,20 @@ type reqTrainData struct {
 
 type server struct {
 	classifiers map[string]*bayesian.Classifier
+	router *gin.Engine
 }
 
-func (s server) predict(c *gin.Context) {
+func (s *server) setupRouter() {
+	s.classifiers = make(map[string]*bayesian.Classifier)
+
+	s.router = gin.Default()
+	s.router.PUT("/classifier/:name", s.addClassifier)
+	s.router.DELETE("/classifier/:name", s.deleteClassifier)
+	s.router.POST("/classifier/train/:name", s.train)
+	s.router.GET("/classifier/predict/:name", s.predict)
+}
+
+func (s *server) predict(c *gin.Context) {
 	name := c.Param("name")
 	model, ok := s.classifiers[name]
 	if !ok {
@@ -44,7 +55,7 @@ func (s server) predict(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"scores": scores, "inx": inx, "strict": strict})
 }
 
-func (s server) train(c *gin.Context) {
+func (s *server) train(c *gin.Context) {
 	name := c.Param("name")
 	model, ok := s.classifiers[name]
 	if !ok {
@@ -65,7 +76,7 @@ func (s server) train(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"result": "ok"})
 }
 
-func (s server) deleteClassifier(c *gin.Context) {
+func (s *server) deleteClassifier(c *gin.Context) {
 	name := c.Param("name")
 	if _, ok := s.classifiers[name]; ok {
 		delete(s.classifiers, name)
@@ -75,26 +86,28 @@ func (s server) deleteClassifier(c *gin.Context) {
 	c.AbortWithError(http.StatusNotFound, errors.New("Not found"))
 }
 
-func (s server) addClassifier(c *gin.Context) {
+func (s *server) addClassifier(c *gin.Context) {
 	name := c.Param("name")
 	body := reqClassifier{}
 	if err := c.BindJSON(&body); err != nil {
-		c.AbortWithError(http.StatusBadRequest, err)
+    c.AbortWithStatusJSON(http.StatusInternalServerError , gin.H{"error": err.Error()})
 		return
 	}
 	if _, set := s.classifiers[name]; set {
 		c.AbortWithError(http.StatusConflict, errors.New("Already exists"))
 		return
 	}
+	if len(body.Classes) < 2 {
+    c.AbortWithStatusJSON(http.StatusInternalServerError , gin.H{"error": "At least 2 classes must be provided"})
+		return
+	}
 	s.classifiers[name] = bayesian.NewClassifier(body.Classes...)
 	c.JSON(http.StatusOK, gin.H{"result": "ok"})
 }
 
-func (s server) runAPI() {
-	router := gin.Default()
-	router.PUT("/classifier/:name", s.addClassifier)
-	router.DELETE("/classifier/:name", s.deleteClassifier)
-	router.POST("/classifier/train/:name", s.train)
-	router.GET("/classifier/predict/:name", s.predict)
-	router.Run()
+
+func (s *server) Go() {
+	s.setupRouter()
+	s.router.Run()
 }
+
