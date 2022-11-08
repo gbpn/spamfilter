@@ -16,6 +16,13 @@ type reqClassifier struct {
 	Classes []bayesian.Class `json:"classes"`
 }
 
+type classifierInfo struct {
+	Name string
+	Learned int
+	WordCount []int
+	Classes []bayesian.Class 
+}
+
 type reqPredict struct {
 	Phrase string `json:"phrase"`
 }
@@ -39,6 +46,7 @@ func (s *server) setupRouter() {
 	s.router.PUT("/classifier/:name", s.addClassifier)
 	s.router.DELETE("/classifier/:name", s.deleteClassifier)
 	s.router.GET("/classifier/:name", s.getClassifier)
+	s.router.GET("/classifier/:name/raw", s.exportClassifier)
 	s.router.POST("/classifier/:name/train", s.train)
 	s.router.GET("/classifier/:name/predict", s.predict)
 }
@@ -61,6 +69,23 @@ func (s *server) predict(c *gin.Context) {
 }
 
 func (s *server) getClassifier(c *gin.Context) {
+	name := c.Param("name")
+	model, ok := s.classifiers[name]
+	
+
+	if !ok {
+		c.AbortWithError(http.StatusNotFound, errors.New("Not found"))
+		return
+	}
+	output := classifierInfo{}
+	output.Name = name
+	output.Learned = model.Learned()
+	output.Classes = model.Classes
+	output.WordCount = model.WordCount()
+	c.JSON(http.StatusOK, output)
+}
+
+func (s *server) exportClassifier(c *gin.Context) {
 	name := c.Param("name")
 	model, ok := s.classifiers[name]
 	if !ok {
