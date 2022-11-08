@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -8,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/nnqq/bayesian"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -31,7 +33,7 @@ func doReq(api server, rtype string, path string, body string) (testHTTPRequest)
 	return res
 }
 
-func TestCreate(t *testing.T) {
+func TestModelCreate(t *testing.T) {
 	var api server
 	gin.SetMode("test")
 	api.setupRouter()
@@ -57,8 +59,12 @@ func TestCreate(t *testing.T) {
 	assert.Equal(t,409, res.response.Code)
 	assert.Contains(t, res.body, "already exists")
 
+	res = doReq(api, "GET", "/classifier/test1", "{}")
+	assert.NoError(t, res.err)
+	assert.Equal(t,200, res.response.Code)
+
 }
-func TestDelete(t *testing.T) {
+func TestModelDelete(t *testing.T) {
 	var api server
 	gin.SetMode("test")
 	api.setupRouter()
@@ -84,6 +90,56 @@ func TestDelete(t *testing.T) {
 	res = doReq(api, "DELETE", "/classifier/test1","")
 	assert.Contains(t, res.body, "not found")
 	assert.Equal(t,404, res.response.Code)
+}
+
+func TestInvalidClass(t *testing.T) {
+	var api server
+	gin.SetMode("test")
+	api.setupRouter()
+	res := doReq(api, "PUT", "/classifier/missing", "{\"classes\":[\"good\",\"bad\"]}")
+	invalidData := reqTrainData{
+		Classes: []bayesian.Class{"nope"},
+		Phrases: []string{ "No such class", },
+	}
+	invalidDatabody,_ := json.Marshal(invalidData)
+	res = doReq(api, "POST", "/classifier/missing/train", string(invalidDatabody))
+	assert.NoError(t, res.err)
+	assert.Equal(t,404, res.response.Code)
+	assert.Contains(t, res.body, "model missing does not have class nope")
+}
+
+func TestTrain(t *testing.T) {
+	var api server
+	gin.SetMode("test")
+	api.setupRouter()
+	res := doReq(api, "PUT", "/classifier/spam","{\"classes\":[\"good\",\"spam\"]}")
+
+	goodData := reqTrainData{
+		Classes: []bayesian.Class{"good"},
+		Phrases: []string{
+			"I love apples",
+			"Dogs are the best",
+			"Lets hang",
+			"Can I borrow 50 bucks?",
+		},
+	}
+	goodDatabody,_ := json.Marshal(goodData)
+	res = doReq(api, "POST", "/classifier/spam/train", string(goodDatabody))
+	spamData := reqTrainData{
+		Classes: []bayesian.Class{"spam"},
+		Phrases: []string{
+			"Donate to our campaign",
+			"I am up for reelection",
+			"Your uncle died and left you a million dollars",
+			"Give me your credit card number",
+		},
+	}
+	spambody,_ := json.Marshal(spamData)
+	res = doReq(api, "POST", "/classifier/spam/train", string(spambody))
+	
+	res = doReq(api, "GET", "/classifier/spam", "{}")
+	assert.NoError(t, res.err)
+	assert.Equal(t,200, res.response.Code)
 }
 
 

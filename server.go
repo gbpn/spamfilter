@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"errors"
+	"fmt"
 	"strings"
 
 	"net/http"
@@ -36,8 +38,9 @@ func (s *server) setupRouter() {
 
 	s.router.PUT("/classifier/:name", s.addClassifier)
 	s.router.DELETE("/classifier/:name", s.deleteClassifier)
-	s.router.POST("/classifier/train/:name", s.train)
-	s.router.GET("/classifier/predict/:name", s.predict)
+	s.router.GET("/classifier/:name", s.getClassifier)
+	s.router.POST("/classifier/:name/train", s.train)
+	s.router.GET("/classifier/:name/predict", s.predict)
 }
 
 func (s *server) predict(c *gin.Context) {
@@ -57,17 +60,53 @@ func (s *server) predict(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"scores": scores, "inx": inx, "strict": strict})
 }
 
-func (s *server) train(c *gin.Context) {
+func (s *server) getClassifier(c *gin.Context) {
 	name := c.Param("name")
 	model, ok := s.classifiers[name]
 	if !ok {
 		c.AbortWithError(http.StatusNotFound, errors.New("Not found"))
 		return
 	}
+	serialized := new(bytes.Buffer)
+	err := model.WriteTo(serialized)
+	if err != nil {
+		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	}
+	c.JSON(http.StatusOK, serialized.String())
+}
+
+func (s *server) modelEnsureClass(name string, class bayesian.Class) (bool) {
+	model, ok := s.classifiers[name]
+	if !ok {
+		return false
+	}
+	for _,v := range model.Classes {
+		if v == class {
+			return true
+		}
+	}
+	return false
+}
+
+
+func (s *server) train(c *gin.Context) {
+	name := c.Param("name")
+	model, ok := s.classifiers[name]
+	if !ok {
+	  c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": "not found"})
+		return
+	}
 	body := reqTrainData{}
-	if err := c.BindJSON(&body); err != nil {
+	if err := c.ShouldBindJSON(&body); err != nil {
 		c.AbortWithError(http.StatusBadRequest, err)
 		return
+	}
+	for _, v := range body.Classes {
+		if s.modelEnsureClass(name, v) != true {
+			msg := fmt.Sprintf("model %s does not have class %s", name, v)
+			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": msg})
+			return 
+		}
 	}
 
 	for _, phrase := range body.Phrases {
