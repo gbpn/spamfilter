@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -21,6 +22,7 @@ type classifierInfo struct {
 	Learned int
 	WordCount []int
 	Classes []bayesian.Class 
+	Words map[bayesian.Class]map[string]float64
 }
 
 type reqPredict struct {
@@ -82,7 +84,13 @@ func (s *server) getClassifier(c *gin.Context) {
 	output.Learned = model.Learned()
 	output.Classes = model.Classes
 	output.WordCount = model.WordCount()
-	c.JSON(http.StatusOK, output)
+	output.Words=make(map[bayesian.Class]map[string]float64)
+	for _,class := range model.Classes {
+		output.Words[class] = model.WordsByClass(class)
+	}
+	out, _ := json.MarshalIndent(output,"","   ")
+	c.Data(http.StatusOK, "application/json", out)
+	//c.JSONP(http.StatusOK, output)
 }
 
 func (s *server) exportClassifier(c *gin.Context) {

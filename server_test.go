@@ -120,6 +120,9 @@ func TestTrain(t *testing.T) {
 			"I love apples",
 			"Dogs are the best",
 			"Lets hang",
+			"What is his \"problem\", dude?",
+			"Please buy my product",
+			"I need to see the doctor. It burns so bad",
 			"Can I borrow 50 bucks?",
 		},
 	}
@@ -130,6 +133,8 @@ func TestTrain(t *testing.T) {
 		Phrases: []string{
 			"Donate to our campaign",
 			"I am up for reelection",
+			"Really, you should reelect me.",
+			"Cody for reelection",
 			"Your uncle died and left you a million dollars",
 			"Give me your credit card number",
 		},
@@ -140,6 +145,7 @@ func TestTrain(t *testing.T) {
 	res = doReq(api, "GET", "/classifier/spam", "{}")
 	assert.NoError(t, res.err)
 	assert.Equal(t,200, res.response.Code)
+	println(res.body)
 }
 
 
