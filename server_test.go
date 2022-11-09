@@ -13,6 +13,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+type classifier bayesian.Classifier
+
 type testHTTPRequest struct{
 	body string
 	err error
@@ -49,12 +51,13 @@ func TestModelCreate(t *testing.T) {
 	assert.Contains(t, res.body, "2 classes")
 
 	// And a good one should work
-	res = doReq(api, "PUT", "/classifier/test1", "{\"classes\":[\"good\",\"bad\"]}")
+	classes := `{"classes":["good","bad"]}"`
+	res = doReq(api, "PUT", "/classifier/test1",classes)
 	assert.NoError(t, res.err)
 	assert.Contains(t, res.body, "ok")
 
 	// But the same classifier twice should be a 409 conflict
-	res = doReq(api, "PUT", "/classifier/test1", "{\"classes\":[\"good\",\"bad\"]}")
+	res = doReq(api, "PUT", "/classifier/test1",classes)
 	assert.NoError(t, res.err)
 	assert.Equal(t,409, res.response.Code)
 	assert.Contains(t, res.body, "already exists")
@@ -75,7 +78,8 @@ func TestModelDelete(t *testing.T) {
 	assert.Equal(t,404, res.response.Code)
 
 	// Make one to delete
-	res = doReq(api, "PUT", "/classifier/test1", "{\"classes\":[\"good\",\"bad\"]}")
+	classes := `{"classes":["good","bad"]}"`
+	res = doReq(api, "PUT", "/classifier/test1",classes)
 	assert.NoError(t, res.err)
 	assert.Equal(t,200, res.response.Code)
 	assert.Contains(t, res.body, "ok")
@@ -96,7 +100,8 @@ func TestInvalidClass(t *testing.T) {
 	var api server
 	gin.SetMode("test")
 	api.setupRouter()
-	res := doReq(api, "PUT", "/classifier/missing", "{\"classes\":[\"good\",\"bad\"]}")
+	classes := `{"classes":["good","bad"]}"`
+	res := doReq(api, "PUT", "/classifier/missing",classes)
 	invalidData := reqTrainData{
 		Classes: []bayesian.Class{"nope"},
 		Phrases: []string{ "No such class", },
@@ -112,7 +117,8 @@ func TestTrain(t *testing.T) {
 	var api server
 	gin.SetMode("test")
 	api.setupRouter()
-	res := doReq(api, "PUT", "/classifier/spam","{\"classes\":[\"good\",\"spam\"]}")
+	classes := `{"classes":["good","spam"]}"`
+	res := doReq(api, "PUT", "/classifier/spam",classes)
 
 	goodData := reqTrainData{
 		Classes: []bayesian.Class{"good"},
@@ -146,6 +152,15 @@ func TestTrain(t *testing.T) {
 	assert.NoError(t, res.err)
 	assert.Equal(t,200, res.response.Code)
 	println(res.body)
+}
+
+func TestPredict(t *testing.T) {
+	var api server
+	gin.SetMode("test")
+	api.setupRouter()
+	classes := `{"classes":["good","spam"]}"`
+	res := doReq(api, "PUT", "/classifier/spam",classes)
+	assert.Equal(t,200, res.response.Code)
 }
 
 
