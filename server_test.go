@@ -158,9 +158,26 @@ func TestPredict(t *testing.T) {
 	var api server
 	gin.SetMode("test")
 	api.setupRouter()
-	classes := `{"classes":["good","spam"]}"`
-	res := doReq(api, "PUT", "/classifier/spam",classes)
+	classes := `{"classes":["fruit","computer"]}"`
+	res := doReq(api, "PUT", "/classifier/things",classes)
 	assert.Equal(t,200, res.response.Code)
+	data := reqTrainData{
+		Classes: []bayesian.Class{"computer"},
+		Phrases: []string{ "Apple", "Dell","Lenovo", "Hewlett Packard", },
+	}
+	encoded,_ := json.Marshal(data)
+	res = doReq(api, "POST", "/classifier/things/train", string(encoded))
+	assert.Equal(t,200, res.response.Code)
+	data = reqTrainData{
+		Classes: []bayesian.Class{"fruit"},
+		Phrases: []string{ "apple", "grapes","apricot", "orange", },
+	}
+	encoded,_ = json.Marshal(data)
+	res = doReq(api, "POST", "/classifier/things/train", string(encoded))
+	assert.Equal(t,200, res.response.Code)
+
+	
+
 }
 
 

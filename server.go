@@ -35,6 +35,7 @@ type reqTrainData struct {
 }
 
 type server struct {
+	classes []bayesian.Class
 	classifiers map[string]*bayesian.Classifier
 	router *gin.Engine
 }
@@ -67,7 +68,7 @@ func (s *server) predict(c *gin.Context) {
 	}
 
 	scores, inx, strict, _ := model.SafeProbScores([]string{body.Phrase})
-	c.JSON(http.StatusOK, gin.H{"scores": scores, "inx": inx, "strict": strict})
+	c.JSON(http.StatusOK, gin.H{"scores": scores, "inx": s.classes[inx], "strict": strict})
 }
 
 func (s *server) getClassifier(c *gin.Context) {
@@ -176,6 +177,7 @@ func (s *server) addClassifier(c *gin.Context) {
 		return
 	}
 	s.classifiers[name] = bayesian.NewClassifier(body.Classes...)
+	s.classes = body.Classes
 	c.JSON(http.StatusOK, gin.H{"result": "ok"})
 }
 
