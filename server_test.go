@@ -158,6 +158,20 @@ func TestPredict(t *testing.T) {
 	var api server
 	gin.SetMode("test")
 	api.setupRouter()
+	buildFruitModel(api, t)
+
+	res := doReq(api, "GET", "/classifier/things/export", "{}")
+	fmt.Println(res.body)
+
+}
+
+func makePredict(in string) (string) {
+	encoded,_ := json.Marshal(map[string]string{"phrase":in})
+	return string(encoded)
+}
+
+
+func buildFruitModel(api server, t *testing.T) {
 	classes := `{"classes":["fruit","computer"]}"`
 	res := doReq(api, "PUT", "/classifier/things",classes)
 	assert.Equal(t,200, res.response.Code)
@@ -192,17 +206,9 @@ func TestPredict(t *testing.T) {
 
 	url := "/classifier/things/predict"
 	for k,v := range tests {
-		res = doReq(api, "GET", url, make_predict(k))
+		res = doReq(api, "GET", url, makePredict(k))
 		if len(v) > 0 {
 			assert.Contains(t, res.body, fmt.Sprintf(`"inx":"%s"`,v), k)
 		}
 	}
-
 }
-
-func make_predict(in string) (string) {
-	encoded,_ := json.Marshal(map[string]string{"phrase":in})
-	return string(encoded)
-}
-
-

@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	b64 "encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -34,6 +35,13 @@ type reqTrainData struct {
 	Phrases []string         `json:"phrases"`
 }
 
+type serverSerialize struct {
+	Classes []bayesian.Class
+	WordCount []int
+	Learned int
+	Obj string
+}
+
 type server struct {
 	classes []bayesian.Class
 	classifiers map[string]*bayesian.Classifier
@@ -49,7 +57,7 @@ func (s *server) setupRouter() {
 	s.router.PUT("/classifier/:name", s.addClassifier)
 	s.router.DELETE("/classifier/:name", s.deleteClassifier)
 	s.router.GET("/classifier/:name", s.getClassifier)
-	s.router.GET("/classifier/:name/raw", s.exportClassifier)
+	s.router.GET("/classifier/:name/export", s.exportClassifier)
 	s.router.POST("/classifier/:name/train", s.train)
 	s.router.GET("/classifier/:name/predict", s.predict)
 }
@@ -99,15 +107,24 @@ func (s *server) exportClassifier(c *gin.Context) {
 	name := c.Param("name")
 	model, ok := s.classifiers[name]
 	if !ok {
-		c.AbortWithError(http.StatusNotFound, errors.New("Not found"))
+		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": fmt.Errorf("Can not find model: %s", name)})
 		return
 	}
+
 	serialized := new(bytes.Buffer)
 	err := model.WriteTo(serialized)
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
 	}
-	c.JSON(http.StatusOK, serialized.String())
+	out := serverSerialize{
+		Classes: model.Classes,
+	  Learned : model.Learned(),
+	  WordCount : model.WordCount(),
+		Obj: b64.StdEncoding.EncodeToString(serialized.Bytes()),
+	}
+	obj,err  := json.Marshal(out)
+	c.Data(http.StatusOK, "application/json", obj)
 }
 
 func (s *server) modelEnsureClass(name string, class bayesian.Class) (bool) {
