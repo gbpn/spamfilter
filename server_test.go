@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -151,7 +152,6 @@ func TestTrain(t *testing.T) {
 	res = doReq(api, "GET", "/classifier/spam", "{}")
 	assert.NoError(t, res.err)
 	assert.Equal(t,200, res.response.Code)
-	println(res.body)
 }
 
 func TestPredict(t *testing.T) {
@@ -176,8 +176,33 @@ func TestPredict(t *testing.T) {
 	res = doReq(api, "POST", "/classifier/things/train", string(encoded))
 	assert.Equal(t,200, res.response.Code)
 
-	
 
+	tests := map[string]string{
+		"apple" : "fruit",
+		"apple orange" : "fruit",
+		"apple apricot" : "fruit",
+		"Apple Hewlett Packard oranges apricot" : "computer",
+		"apple grapes apricot" : "fruit",
+		"grapes apricot" : "fruit",
+		"Dell" : "computer",
+		"Dell Hewlett Packard" : "computer",
+		"Apple grapes" : "",
+		"shoes socks" : "",
+	}
+
+	url := "/classifier/things/predict"
+	for k,v := range tests {
+		res = doReq(api, "GET", url, make_predict(k))
+		if len(v) > 0 {
+			assert.Contains(t, res.body, fmt.Sprintf(`"inx":"%s"`,v), k)
+		}
+	}
+
+}
+
+func make_predict(in string) (string) {
+	encoded,_ := json.Marshal(map[string]string{"phrase":in})
+	return string(encoded)
 }
 
 

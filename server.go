@@ -66,15 +66,10 @@ func (s *server) predict(c *gin.Context) {
 		c.AbortWithError(http.StatusBadRequest, err)
 		return
 	}
+	input := strings.Split(body.Phrase," ")
 
-	scores, inx, strict, _ := model.SafeProbScores([]string{body.Phrase})
-
-	winner := "false"
-	if strict {
-		winner = "true"
-	}
-
-	c.JSON(http.StatusOK, gin.H{"scores": scores, "inx": s.classes[inx], "winner": winner})
+	scores, inx, strict, _ := model.SafeProbScores(input)
+	c.JSON(http.StatusOK, gin.H{"scores": scores, "inx": s.classes[inx], "winner": strict})
 }
 
 func (s *server) getClassifier(c *gin.Context) {
