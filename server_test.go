@@ -36,6 +36,16 @@ func doReq(api server, rtype string, path string, body string) (testHTTPRequest)
 	return res
 }
 
+func TestIndex(t *testing.T) {
+	var api server
+	gin.SetMode("test")
+	api.setupRouter()
+	// Classifier must have a json body
+	res := doReq(api, "GET", "/", "")
+	assert.NoError(t, res.err)
+	fmt.Printf("%+v", res.body)
+}
+
 func TestModelCreate(t *testing.T) {
 	var api server
 	gin.SetMode("test")
@@ -162,7 +172,6 @@ func TestPredict(t *testing.T) {
 
 	res := doReq(api, "GET", "/classifier/things/export", "{}")
 	fmt.Println(res.body)
-
 }
 
 func makePredict(in string) (string) {
@@ -207,8 +216,12 @@ func buildFruitModel(api server, t *testing.T) {
 	url := "/classifier/things/predict"
 	for k,v := range tests {
 		res = doReq(api, "GET", url, makePredict(k))
+		fmt.Printf(res.body)
+		println()
+		println()
 		if len(v) > 0 {
-			assert.Contains(t, res.body, fmt.Sprintf(`"inx":"%s"`,v), k)
+			assert.Contains(t, res.body, fmt.Sprintf(`"name":"%s"`,v), k)
 		}
 	}
+
 }

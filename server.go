@@ -35,7 +35,7 @@ type reqTrainData struct {
 	Phrases []string         `json:"phrases"`
 }
 
-type serverSerialize struct {
+type respSerialize struct {
 	Classes []bayesian.Class
 	WordCount []int
 	Learned int
@@ -54,6 +54,7 @@ func (s *server) setupRouter() {
 
 	s.router.Use(gin.Recovery())
 
+	s.router.GET("/", s.info)
 	s.router.PUT("/classifier/:name", s.addClassifier)
 	s.router.DELETE("/classifier/:name", s.deleteClassifier)
 	s.router.GET("/classifier/:name", s.getClassifier)
@@ -62,7 +63,24 @@ func (s *server) setupRouter() {
 	s.router.GET("/classifier/:name/predict", s.predict)
 }
 
+// FIXME this does not yet work. json cant marshal a function name
+func (s *server) info(c *gin.Context) {
+	resp := respInfo{
+		Routes : s.router.Routes(),
+	}
+	obj,_  := json.Marshal(resp)
+	//println(err.Error())
+	c.Data(http.StatusOK, "application/json", obj)
+}
+
+
+type respInfo struct {
+	Routes []gin.RouteInfo `json:"Routes"`
+}
+
 func (s *server) predict(c *gin.Context) {
+	var total float64
+
 	name := c.Param("name")
 	model, ok := s.classifiers[name]
 	if !ok {
@@ -74,10 +92,26 @@ func (s *server) predict(c *gin.Context) {
 		c.AbortWithError(http.StatusBadRequest, err)
 		return
 	}
-	input := strings.Split(body.Phrase," ")
 
+	input := strings.Split(body.Phrase," ")
 	scores, inx, strict, _ := model.SafeProbScores(input)
-	c.JSON(http.StatusOK, gin.H{"scores": scores, "inx": s.classes[inx], "winner": strict})
+	percents := make([]float64, len(scores))
+
+	for _,v := range scores {
+		total += v
+	}
+
+	for i,v := range scores {
+		percents[i] = float64(int(v*10000)) / 100
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"winner": strict,
+		"name": s.classes[inx],
+		"score": float64(int(scores[inx]*10000))/100,
+		"percents": percents,
+		"scores": scores,
+	})
 }
 
 func (s *server) getClassifier(c *gin.Context) {
@@ -100,7 +134,6 @@ func (s *server) getClassifier(c *gin.Context) {
 	}
 	out, _ := json.MarshalIndent(output,"","   ")
 	c.Data(http.StatusOK, "application/json", out)
-	//c.JSONP(http.StatusOK, output)
 }
 
 func (s *server) exportClassifier(c *gin.Context) {
@@ -117,7 +150,7 @@ func (s *server) exportClassifier(c *gin.Context) {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	out := serverSerialize{
+	out := respSerialize{
 		Classes: model.Classes,
 	  Learned : model.Learned(),
 	  WordCount : model.WordCount(),
