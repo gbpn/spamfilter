@@ -59,6 +59,7 @@ func (s *server) setupRouter() {
 	s.router.DELETE("/classifier/:name", s.deleteClassifier)
 	s.router.GET("/classifier/:name", s.getClassifier)
 	s.router.GET("/classifier/:name/export", s.exportClassifier)
+	s.router.PUT("/classifier/:name/import", s.importClassifier)
 	s.router.POST("/classifier/:name/train", s.train)
 	s.router.GET("/classifier/:name/predict", s.predict)
 }
@@ -106,11 +107,12 @@ func (s *server) predict(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"winner": strict,
+		"id": inx,
 		"name": s.classes[inx],
-		"score": float64(int(scores[inx]*10000))/100,
+		"percent": float64(int(scores[inx]*10000))/100,
 		"percents": percents,
-		"scores": scores,
+		"raw": scores,
+		"winner": strict,
 	})
 }
 
@@ -136,6 +138,31 @@ func (s *server) getClassifier(c *gin.Context) {
 	c.Data(http.StatusOK, "application/json", out)
 }
 
+func (s *server) importClassifier(c *gin.Context) {
+	name := c.Param("name")
+
+	data := respSerialize{}
+
+	if err := c.ShouldBindJSON(&data); err != nil {
+		c.AbortWithError(http.StatusBadRequest, err)
+		return
+	}
+	raw,err := b64.StdEncoding.DecodeString(data.Obj)
+	if err != nil {
+		c.AbortWithError(http.StatusBadRequest, err)
+		return
+	}
+	obj := strings.NewReader(string(raw))
+
+	model, err :=  bayesian.NewClassifierFromReader(obj)
+	if err != nil {
+		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	s.classifiers[name] = model
+
+	c.JSON(http.StatusOK, gin.H{"result": "ok"})
+}
 func (s *server) exportClassifier(c *gin.Context) {
 	name := c.Param("name")
 	model, ok := s.classifiers[name]

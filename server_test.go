@@ -170,8 +170,23 @@ func TestPredict(t *testing.T) {
 	api.setupRouter()
 	buildFruitModel(api, t)
 
+}
+func TestExportImport(t *testing.T) {
+	var api server
+	gin.SetMode("test")
+	api.setupRouter()
+	buildFruitModel(api, t)
 	res := doReq(api, "GET", "/classifier/things/export", "{}")
-	fmt.Println(res.body)
+	exported := respSerialize{}
+	err := json.Unmarshal([]byte(res.body),&exported) 
+	assert.NoError(t, err)
+
+	res = doReq(api, "PUT", "/classifier/newthings/import", res.body)
+
+	res = doReq(api, "GET", "/classifier/newthings", "{}")
+	assert.NoError(t, res.err)
+	assert.Equal(t,200, res.response.Code)
+
 }
 
 func makePredict(in string) (string) {
@@ -216,9 +231,6 @@ func buildFruitModel(api server, t *testing.T) {
 	url := "/classifier/things/predict"
 	for k,v := range tests {
 		res = doReq(api, "GET", url, makePredict(k))
-		fmt.Printf(res.body)
-		println()
-		println()
 		if len(v) > 0 {
 			assert.Contains(t, res.body, fmt.Sprintf(`"name":"%s"`,v), k)
 		}
